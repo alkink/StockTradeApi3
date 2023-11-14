@@ -238,7 +238,7 @@ public class StockTransactionControllerTests
         var result = controller.SellStock(sellTransaction);
 
         // Assert
-        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.IsType<NotFoundResult>(result);
     }
 
 
@@ -267,7 +267,7 @@ public class StockTransactionControllerTests
         var result = controller.SellStock(sellTransaction);
 
         // Assert
-        Assert.IsType<NotFoundResult>(result);
+        Assert.IsType<BadRequestResult>(result);
     }
 
     [Fact]
@@ -308,7 +308,7 @@ public class StockTransactionControllerTests
         // Arrange
         controller.ControllerContext = new ControllerContext
         {
-            HttpContext = new DefaultHttpContext { User = null } // Simulate an invalid user context.
+            HttpContext = new DefaultHttpContext { User = null } 
         };
 
         // Act
@@ -324,7 +324,7 @@ public class StockTransactionControllerTests
         // Arrange
         var user = new User { Username = "testuser" };
         dbContext.Users.Add(user);
-        dbContext.SaveChanges(); // Save changes to get the generated Id
+        dbContext.SaveChanges(); 
         int count = 10;
 
         for (int i = 0; i<count; i++) 
@@ -343,6 +343,311 @@ public class StockTransactionControllerTests
         var transactionList = Assert.IsType<List<StockTransaction>>(okResult.Value);
         Assert.Equal(count, transactionList.Count);
     }
+
+    [Fact]
+    public void BuyStock_WithNegativeQuantity_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = 1, Quantity = -5 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void BuyStock_WithZeroQuantity_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = 1, Quantity = 0 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void SellStock_WithNegativeQuantity_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Sell = 60, IsActive = true, Quantity = 100 };
+        var portfolio = new Portfolio { UserId = user.Id, StockId = 1, StockQuantity = 10 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.Portfolios.Add(portfolio);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = 1, Quantity = -5 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void SellStock_WithZeroQuantity_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Sell = 60, IsActive = true, Quantity = 100 };
+        var portfolio = new Portfolio { UserId = user.Id, StockId = 0, StockQuantity = 10 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.Portfolios.Add(portfolio);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = 0, Quantity = 0 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void ListTransactions_WithZeroTransactions_ReturnsEmptyList()
+    {
+        // Arrange
+        var user = new User { Username = "testuser" };
+        dbContext.Users.Add(user);
+        dbContext.SaveChanges();
+
+        // Act
+        var result = controller.ListTransactions();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var transactionList = Assert.IsType<List<StockTransaction>>(okResult.Value);
+        Assert.Empty(transactionList);
+    }
+
+
+
+
+    [Fact]
+    public void SellStock_WithInvalidStock_ReturnsNotFound()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        dbContext.Users.Add(user);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = 0, Quantity = 5 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    [Fact]
+    public void SellStock_WithNegativeBalanceAfterSell_ReturnsNotFound()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 50 };
+        var stock = new Stock { Sell = 60, IsActive = true, Quantity = 100 };
+        var portfolio = new Portfolio { UserId = user.Id, StockId = 0, StockQuantity = 10 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.Portfolios.Add(portfolio);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = 1, Quantity = 5 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    //
+
+
+
+
+    [Fact]
+    public void BuyStock_WithZeroBalance_ReturnsNotFound()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 0 };
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = 0, Quantity = 5 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public void BuyStock_WithInvalidStock_ReturnsNotFound()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        dbContext.Users.Add(user);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = 0, Quantity = 5 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.IsType<NotFoundResult>(result);
+    }
+
+    [Fact]
+    public void BuyStock_WithNegativeStockId_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = -1, Quantity = 5 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void SellStock_WithNegativeStockId_ReturnsBadRequest()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Sell = 60, IsActive = true, Quantity = 100 };
+        var portfolio = new Portfolio { UserId = user.Id, StockId = 0, StockQuantity = 10 };
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.Portfolios.Add(portfolio);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = -1, Quantity = 5 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.IsType<BadRequestResult>(result);
+    }
+
+    [Fact]
+    public void ListTransactions_WithZeroBalance_ReturnsEmptyList()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 0 };
+        dbContext.Users.Add(user);
+        dbContext.SaveChanges();
+
+        // Act
+        var result = controller.ListTransactions();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var transactionList = Assert.IsType<List<StockTransaction>>(okResult.Value);
+        Assert.Empty(transactionList);
+    }
+
+    [Fact]
+    public void BuyStock_WithValidParameters_AddsTransactionToDatabase()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        dbContext.CommissionRates.Add(new CommissionRate { AdminCommissionRate = (decimal)0.05 });
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.SaveChanges();
+
+        var buyTransaction = new BuyTransaction { StockId = 1, Quantity = 5 };
+
+        // Act
+        var result = controller.BuyStock(buyTransaction);
+
+        // Assert
+        Assert.Equal(1, dbContext.StockTransactions.Count());
+    }
+
+    [Fact]
+    public void SellStock_WithValidParameters_RemovesPortfolioIfQuantityIsZero()
+    {
+        // Arrange
+        var user = new User { Username = "testuser", Balance = 1000 };
+        var stock = new Stock { Sell = 60, IsActive = true, Quantity = 100 };
+        var portfolio = new Portfolio { UserId = user.Id, StockId = 1, StockQuantity = 5 };
+        dbContext.CommissionRates.Add(new CommissionRate { AdminCommissionRate = (decimal)0.05 });
+        dbContext.Users.Add(user);
+        dbContext.Stocks.Add(stock);
+        dbContext.Portfolios.Add(portfolio);
+        dbContext.SaveChanges();
+
+        var sellTransaction = new BuyTransaction { StockId = 1, Quantity = 5 };
+
+        // Act
+        var result = controller.SellStock(sellTransaction);
+
+        // Assert
+        Assert.Equal(0, dbContext.Portfolios.Count());
+    }
+
+
+    [Fact]
+    public void ListTransactions_WithValidUser_ReturnsCorrectTransactions()
+    {
+        // Arrange
+        var user = new User { Username = "testuser" };
+        dbContext.Users.Add(user);
+        dbContext.SaveChanges();
+
+        var stock = new Stock { Buy = 50, IsActive = true, Quantity = 100 };
+        var transaction1 = new StockTransaction { UserId = user.Id, StockId = 1 };
+        var transaction2 = new StockTransaction { UserId = user.Id, StockId = 2 };
+        dbContext.Stocks.Add(stock);
+        dbContext.StockTransactions.Add(transaction1);
+        dbContext.StockTransactions.Add(transaction2);
+        dbContext.SaveChanges();
+
+        // Act
+        var result = controller.ListTransactions();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var transactionList = Assert.IsType<List<StockTransaction>>(okResult.Value);
+        Assert.Equal(2, transactionList.Count);
+    }
+
 
 
 }

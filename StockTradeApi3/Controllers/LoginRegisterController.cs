@@ -39,16 +39,23 @@ namespace StockTradeApi3.Controllers
             return Ok(token);
         }
 
-
         [HttpPost("Register")]
-        public User Add([FromBody] User user)
+        public IActionResult Add([FromBody] User user)
         {
-            User user2 = user;
+            // Check if the user with the same ID already exists
+            if (db1.Users.FirstOrDefault(x => x.Id == user.Id) != null)
+            {
+                return Conflict("User with the same ID already exists");
+            }
+
+            // If not, set the default role and add the user to the database
             user.Role = "user";
-            db1.Users.Add(user2);
+            db1.Users.Add(user);
             db1.SaveChanges();
-            return user2;
+
+            return Ok(user);
         }
+
 
 
 

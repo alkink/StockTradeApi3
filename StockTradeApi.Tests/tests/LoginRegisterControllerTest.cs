@@ -111,6 +111,23 @@ namespace StockTradeApiTests.tests
             Assert.NotNull(result);
             Assert.Equal(409, result.StatusCode); 
         }
+
+        [Fact]
+        public void CreateToken_ValidUser_ReturnsJwtToken()
+        {
+            // Arrange
+            var validUser = new User { Username = "validUser", Password = "validPassword", Role = "user" };
+
+            // Use reflection to access private method
+            var methodInfo = typeof(LoginRegisterController).GetMethod("CreateToken", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            // Act
+            var token = methodInfo.Invoke(controller, new object[] { validUser });
+
+            // Assert
+            Assert.NotNull(token);
+        }
+
     }
 }
 
