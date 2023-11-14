@@ -72,101 +72,124 @@ namespace StockTradeApi3.Controllers
         [HttpPost("Buy")]
         public IActionResult BuyStock([FromBody] BuyTransaction buy)
         {
-            int Stockid = (int)buy.StockId!;
+            int stockId = (int)buy.StockId!;
             int quantity = (int)buy.Quantity!;
 
-            string? userNameToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrEmpty(userNameToken))
+            if (quantity <= 0 || stockId < 0)
             {
-                User user = db1.Users.FirstOrDefault(x => x.Username == userNameToken);
-
-                if (user != null && db1.Stocks.FirstOrDefault(x => x.Id == Stockid).IsActive == true &&
-                    user.Balance >= quantity * stockData.Find(s => s.Id == Stockid).Buy &&
-                    db1.Stocks.FirstOrDefault(x=> x.Id == Stockid).Quantity >= quantity )
-                {
-                    Stock stock = stockData.Find(s => s.Id == Stockid);
-                    StockTransaction transaction = new StockTransaction { UserId = user.Id, Quantity = quantity, StockId = Stockid, Price = stock!.Buy, Type = "Buy", TransactionDate = DateTime.Now };
-                    db1.StockTransactions.Add(transaction);
-                    db1.SaveChanges();
-
-
-                    if (db1.Portfolios.FirstOrDefault(x => x.StockId == Stockid) != null)
-                    {
-                        Portfolio portfolio = db1.Portfolios.FirstOrDefault(x => x.StockId == Stockid);
-                        portfolio.StockQuantity += quantity;
-                    }
-                    else
-                    {
-                        Portfolio portfolio = new Portfolio { UserId = user.Id, StockId = Stockid, StockQuantity = quantity, StockTransaction = db1.StockTransactions.FirstOrDefault(x => x.Id == transaction.Id) };
-                        db1.Portfolios.Add(portfolio);
-                    }
-                    db1.SaveChanges();
-                    updateStock(stock, quantity, "Buy");
-                    updateBuyBalance(stock, user, quantity);
-                    db1.SaveChanges();
-
-
-
-                    return Ok();
-                }
-                db1.SaveChanges();
+                return BadRequest();
             }
-            return NotFound();
+
+            string? userNameToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userNameToken))
+            {
+                return NotFound();
+            }
+
+            User user = db1.Users.FirstOrDefault(x => x.Username == userNameToken);
+            Stock stock = stockData.Find(s => s.Id == stockId);
+
+            bool stockIsActive = db1.Stocks.FirstOrDefault(x => x.Id == stockId)?.IsActive == true;
+            bool enoughBalance = user?.Balance >= quantity * (stock?.Buy ?? 0);
+            bool enoughQuantity = db1.Stocks.FirstOrDefault(x => x.Id == stockId)?.Quantity >= quantity;
+
+            if (user == null || stock == null || !stockIsActive || !enoughBalance || !enoughQuantity)
+            {
+                db1.SaveChanges();
+                return NotFound();
+            }
+
+            StockTransaction transaction = new StockTransaction
+            {
+                UserId = user.Id,
+                Quantity = quantity,
+                StockId = stockId,
+                Price = stock.Buy,
+                Type = "Buy",
+                TransactionDate = DateTime.Now
+            };
+
+            db1.StockTransactions.Add(transaction);
+            db1.SaveChanges();
+
+            Portfolio portfolio = db1.Portfolios.FirstOrDefault(x => x.StockId == stockId);
+            if (portfolio != null)
+            {
+                portfolio.StockQuantity += quantity;
+            }
+            else
+            {
+                Portfolio newPortfolio = new Portfolio
+                {
+                    UserId = user.Id,
+                    StockId = stockId,
+                    StockQuantity = quantity,
+                    StockTransaction = db1.StockTransactions.FirstOrDefault(x => x.Id == transaction.Id)
+                };
+                db1.Portfolios.Add(newPortfolio);
+            }
+
+            db1.SaveChanges();
+            updateStock(stock, quantity, "Buy");
+            updateBuyBalance(stock, user, quantity);
+
+            return Ok();
         }
+
 
         [HttpPost("Sell")]
         public IActionResult SellStock([FromBody] BuyTransaction sell)
         {
-            int StockId = (int)sell.StockId!;
+            int stockId = (int)sell.StockId!;
             int quantity = (int)sell.Quantity!;
 
-            string? userNameToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!string.IsNullOrEmpty(userNameToken))
+            if (quantity <= 0 || stockId < 0)
             {
-                User user = db1.Users.FirstOrDefault(x => x.Username == userNameToken);
-
-                if (user != null)
-                {
-
-                    Portfolio portfolio = db1.Portfolios.FirstOrDefault(x => x.StockId == StockId);
-                    if (portfolio != null && db1.Stocks.FirstOrDefault(x=>x.Id == StockId).IsActive == true)
-                    {
-                        Stock stock = stockData.Find(s => s.Id == portfolio.StockId);
-                        if ((portfolio.StockQuantity - quantity) > 0)
-                        {
-                            portfolio.StockQuantity -= quantity;
-                            stock.Quantity += quantity;
-                            SaveTransaction(stock, user, quantity, "Sell");
-                        }
-                        else if ((portfolio.StockQuantity - quantity) == 0)
-                        {
-                            SaveTransaction(stock, user, quantity, "Sell");
-                            stock.Quantity += quantity;
-                            db1.Remove(portfolio);
-
-                        }
-                        else
-                        {
-                            return NotFound("you dont have enough amount of stock ");
-                        }
-                        db1.SaveChanges();
-                        updateStock(stock, quantity, "Sell");
-                        updateSellBalance(stock, user, portfolio);
-                    }
-                    else
-                    {
-                        return NotFound("you don't have any of this stock ");
-                    }
-
-                    return Ok(portfolio);
-                }
-                else
-                {
-                    return NotFound("you don't have enough budget");
-                }
+                return BadRequest();
             }
-            return NotFound();
+
+            string? userNameToken = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userNameToken))
+            {
+                return NotFound();
+            }
+
+            User user = db1.Users.FirstOrDefault(x => x.Username == userNameToken);
+            if (user == null)
+            {
+                return NotFound("You don't have enough budget.");
+            }
+
+            Portfolio portfolio = db1.Portfolios.FirstOrDefault(x => x.StockId == stockId);
+            Stock stock = stockData.Find(s => s.Id == portfolio?.StockId);
+
+            if (portfolio == null || stock == null || (db1.Stocks.FirstOrDefault(x => x.Id == stockId)?.IsActive != true))
+            {
+                return NotFound("You don't have any of this stock.");
+            }
+
+            if (portfolio.StockQuantity < quantity)
+            {
+                return NotFound("You don't have enough amount of stock.");
+            }
+
+            portfolio.StockQuantity -= quantity;
+            stock.Quantity += quantity;
+
+            SaveTransaction(stock, user, quantity, "Sell");
+
+            if (portfolio.StockQuantity == 0)
+            {
+                db1.Remove(portfolio);
+            }
+
+            db1.SaveChanges();
+            updateStock(stock, quantity, "Sell");
+            updateSellBalance(stock, user, portfolio);
+
+            return Ok(portfolio);
         }
+
 
         public void SaveTransaction(Stock stock, User user, int quantity, string buyOrSell)
         {
